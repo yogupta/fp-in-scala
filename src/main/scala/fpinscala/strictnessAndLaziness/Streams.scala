@@ -1,7 +1,7 @@
 package fpinscala.strictnessAndLaziness
 
 
-import fpinscala.strictnessAndLaziness.Stream.{cons, empty}
+import fpinscala.strictnessAndLaziness.Stream.{cons, empty, _}
 
 import scala.annotation.tailrec
 
@@ -83,25 +83,6 @@ sealed trait Stream[+A] {
   def flatMap[B](f: A => Stream[B]): Stream[B] =
     foldRight(empty: Stream[B])((head, tail) => f(head) append tail)
 
-  // EXERCISE 5.11: Write a more general stream-building function called unfold.
-  // It takes an initial state, and a function for producing both the next state and the next value in the generated stream.
-  def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = f(z) match {
-    case Some((a, s)) => cons(a, unfold(s)(f))
-    case None => empty
-  }
-
-  // EXERCISE 5.12: Write fibs, from, constant, and ones in terms of unfold.
-  def fibsUnfold: Stream[Int] =
-    unfold((0, 1)) { case (f0, f1) => Some((f0, (f1, f0 + f1))) }
-
-  def fromUnfold(n: Int): Stream[Int] =
-    unfold(n)(el => Some((el, el + 1)))
-
-  def constantUnfold(n: Int): Stream[Int] =
-    unfold(n)(_ => Some((n, n)))
-
-  def ones: Stream[Int] = unfold(1)(_ => Some((1, 1)))
-
   // EXERCISE 5.13
   def mapUnfold[B](f: A => B): Stream[B] = unfold(this) {
     case Cons(h, t) => Some((f(h()), t()))
@@ -125,6 +106,10 @@ sealed trait Stream[+A] {
       case (Cons(h1, t1), Cons(h2, t2)) => Some((f(h1(), h2()), (t1(), t2())))
       case _ => None
     }
+
+  // special case of `zipWith`
+  def zip[B](s2: Stream[B]): Stream[(A, B)] =
+    zipWith(s2)((_, _))
 
   def zipWithAll[B, C](s2: Stream[B])(f: (Option[A], Option[B]) => C): Stream[C] =
     unfold((this, s2)) {
@@ -168,6 +153,12 @@ sealed trait Stream[+A] {
       (b2, cons(b2, p1._2))
     })._2
 
+  @annotation.tailrec
+  final def find(f: A => Boolean): Option[A] = this match {
+    case Empty => None
+    case Cons(h, t) => if (f(h())) Some(h()) else t().find(f)
+  }
+
 }
 
 case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A] {
@@ -177,7 +168,7 @@ case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A] {
 case object Empty extends Stream[Nothing]
 
 
-object Stream extends App {
+object Stream {
   def cons[A](hd: => A, tl: => Stream[A]): Stream[A] = {
     lazy val head: A = hd
     lazy val tail: Stream[A] = tl
@@ -188,6 +179,26 @@ object Stream extends App {
 
   def apply[A](as: A*): Stream[A] =
     if (as.isEmpty) empty else cons(as.head, apply(as.tail: _*))
+
+
+  // EXERCISE 5.11: Write a more general stream-building function called unfold.
+  // It takes an initial state, and a function for producing both the next state and the next value in the generated stream.
+  def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = f(z) match {
+    case Some((a, s)) => cons(a, unfold(s)(f))
+    case None => empty
+  }
+
+  // EXERCISE 5.12: Write fibs, from, constant, and ones in terms of unfold.
+  def fibsUnfold: Stream[Int] =
+    unfold((0, 1)) { case (f0, f1) => Some((f0, (f1, f0 + f1))) }
+
+  def fromUnfold(n: Int): Stream[Int] =
+    unfold(n)(el => Some((el, el + 1)))
+
+  def constantUnfold(n: Int): Stream[Int] =
+    unfold(n)(_ => Some((n, n)))
+
+  def ones: Stream[Int] = unfold(1)(_ => Some((1, 1)))
 
   //EXERCISE 5.8: Generalize ones slightly to the function constant, which returns an infinite Stream of a given value.
   def constant[A](a: A): Stream[A] = cons(a, constant(a))

@@ -127,6 +127,10 @@ object FunctionalState {
 
     def rollDie: Rand[Int] = map(nonNegativeLessThan(6))(_ + 1)
 
+    def boolean(rng: RNG): (Boolean, RNG) =
+      rng.nextInt match {
+        case (i, rng2) => (i % 2 == 0, rng2)
+      }
 
   }
 
